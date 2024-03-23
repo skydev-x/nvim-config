@@ -18,12 +18,14 @@ return {
 		-- see below for full list of optional dependencies 👇
 	},
 	opts = {
+
 		workspaces = {
 			{
 				name = "personal",
 				path = "~/docx/ipad-vault/",
 			},
 		},
+
 		templates = {
 			subdir = "templates",
 			date_format = "%Y-%m-%d-%a",
@@ -34,6 +36,23 @@ return {
 				end,
 			},
 		},
-		-- see below for full list of options 👇
-	},
+
+		-- this is the default configuration
+		mappings = {
+			-- Overrides the 'gf' mapping to work on markdown/wiki links within your vault.
+			["gf"] = {
+				action = function()
+					return require("obsidian").util.gf_passthrough()
+				end,
+				opts = { noremap = false, expr = true, buffer = true },
+			},
+			-- Toggle check-boxes.
+			["<leader>ch"] = {
+				action = function()
+					return require("obsidian").util.toggle_checkbox()
+				end,
+				opts = { buffer = true },
+			},
+		},
+	}, -- Specify how to handle attachments.
 }
