@@ -8,8 +8,8 @@ return {
 		-- If you want to use the home shortcut '~' here you need to call 'vim.fn.expand'.
 		"BufReadPre "
 			.. vim.fn.expand("~")
-			.. "docx/ipad-vault/**.md",
-		"BufNewFile " .. vim.fn.expand("~") .. "docx/ipad-vault/**.md",
+			.. "docx/shared-vault/**.md",
+		"BufNewFile " .. vim.fn.expand("~") .. "docx/shared-vault/**.md",
 	},
 	dependencies = {
 		-- Required.
@@ -22,7 +22,7 @@ return {
 		workspaces = {
 			{
 				name = "personal",
-				path = "~/docx/ipad-vault/",
+				path = "~/docx/shared-vault/",
 			},
 		},
 
