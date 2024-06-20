@@ -34,3 +34,8 @@ keymap.set("n", "<leader>tf", "<cmd>tabnew %<CR>", { desc = "Open current buffer
 keymap.set("n", "<leader>rn", ":IncRename ")
 vim.keymap.set("n", "<leader>tt", '<CMD>lua require("FTerm").toggle()<CR>')
 vim.keymap.set("t", "<leader>tt", '<C-\\><C-n><CMD>lua require("FTerm").toggle()<CR>')
+-- leetcode
+keymap.set("n", "<leader>L", ":Leet<CR>", { noremap = true, silent = true })
+keymap.set("n", "<leader>l", ":Leet list<CR>", { noremap = true, silent = true })
+keymap.set("n", "<leader>t", ":Leet test<CR>", { noremap = true, silent = true })
+keymap.set("n", "<leader>s", ":Leet submit<CR>", { noremap = true, silent = true })
