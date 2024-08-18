@@ -112,7 +112,7 @@ return {
 		basic.section_x = {
 			hl_colors = airline_colors.c,
 			text = function(_, _, width)
-				local datetime = os.date(" %d-%m-%Y   %H:%M:%S")
+				local datetime = os.date(" %d-%m-%Y   %H:%M")
 				if width > width_breakpoint then
 					return {
 						{ datetime },

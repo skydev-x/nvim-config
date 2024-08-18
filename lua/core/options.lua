@@ -1,4 +1,3 @@
-
 local opt = vim.opt -- for conciseness
 
 -- line numbers
@@ -42,4 +41,3 @@ opt.splitbelow = true -- split horizontal window to the bottom
 -- turn off swapfile
 opt.swapfile = false
 opt.scrolloff = 999 -- make cursor at center in mid of file
-
