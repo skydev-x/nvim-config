@@ -1,20 +1,16 @@
+-- mason.nvim v2 + mason-lspconfig v2.
+-- v2 renamed `automatic_installation` -> `automatic_enable`, dropped `setup_handlers`,
+-- and `ensure_installed` only accepts *LSP server* names (linters/formatters go to
+-- mason-tool-installer below).
 return {
-	"williamboman/mason.nvim",
+	"mason-org/mason.nvim",
 	dependencies = {
-		"williamboman/mason-lspconfig.nvim",
+		"mason-org/mason-lspconfig.nvim",
 		"WhoIsSethDaniel/mason-tool-installer.nvim",
+		"neovim/nvim-lspconfig",
 	},
 	config = function()
-		-- import mason
-		local mason = require("mason")
-
-		-- import mason-lspconfig
-		local mason_lspconfig = require("mason-lspconfig")
-
-		local mason_tool_installer = require("mason-tool-installer")
-
-		-- enable mason and configure icons
-		mason.setup({
+		require("mason").setup({
 			ui = {
 				icons = {
 					package_installed = "✓",
@@ -24,36 +20,43 @@ return {
 			},
 		})
 
-		mason_lspconfig.setup({
-			-- list of servers for mason to install
+		require("mason-lspconfig").setup({
 			ensure_installed = {
-				"tsserver",
-				"html",
+				-- requested languages
+				"clangd", -- c / c++
+				"gopls", -- go
+				"kotlin_language_server", -- kotlin
+				"pyright", -- python
+				"rust_analyzer", -- rust
+				"ts_ls", -- javascript / typescript (was "tsserver")
+				-- web / misc
 				"cssls",
-				"tailwindcss",
-				"svelte",
-				"lua_ls",
-				"graphql",
 				"emmet_ls",
+				"graphql",
+				"html",
+				"lua_ls",
 				"prismals",
-				"pyright",
-				"gopls",
-				"clangd",
-				"zls",
-				"kotlin_language_server",
+				"svelte",
+				"tailwindcss",
+				-- NOTE: swift/objective-c use sourcekit-lsp, which ships with Xcode and
+				-- is NOT a Mason package. It is enabled in lspconfig.lua instead.
 			},
-			-- auto-install configured servers (with lspconfig)
-			automatic_installation = true, -- not the same as ensure_installed
+			automatic_enable = true,
 		})
 
-		mason_tool_installer.setup({
+		require("mason-tool-installer").setup({
 			ensure_installed = {
-				"prettier", -- prettier formatter
+				"prettier", -- js/ts/css/html/json/yaml/md formatter
 				"stylua", -- lua formatter
-				"isort", -- python formatter
+				"isort", -- python import sorter
 				"black", -- python formatter
-				"pylint", -- python linter
-				"eslint_d", -- js linter
+				"ruff", -- python linter
+				"eslint_d", -- js/ts linter
+				"gofumpt", -- go formatter
+				"goimports", -- go import fixer
+				"ktlint", -- kotlin formatter + linter
+				"clang-format", -- c / c++ / objective-c formatter
+				"shfmt", -- shell formatter
 			},
 		})
 	end,

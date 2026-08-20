@@ -1,66 +1,81 @@
+-- nvim-treesitter `main` branch (the old `nvim-treesitter.configs` module is gone).
+-- Highlighting / indent are now started per-buffer with the core vim.treesitter API.
 return {
 	{
 		"nvim-treesitter/nvim-treesitter",
-		event = { "BufReadPre", "BufNewFile" },
+		branch = "main",
+		lazy = false,
 		build = ":TSUpdate",
-		dependencies = {
-			"nvim-treesitter/nvim-treesitter-textobjects",
-			"windwp/nvim-ts-autotag",
-		},
 		config = function()
-			-- import nvim-treesitter plugin
-			local treesitter = require("nvim-treesitter.configs")
+			local ts = require("nvim-treesitter")
 
-			-- configure treesitter
-			treesitter.setup({ -- enable syntax highlighting
-				highlight = {
-					enable = true,
-				},
-				-- enable indentation
-				indent = { enable = true },
-				-- enable autotagging (w/ nvim-ts-autotag plugin)
-				autotag = {
-					enable = true,
-				},
-				-- ensure these language parsers are installed
-				ensure_installed = {
-					"json",
-					"javascript",
-					"typescript",
-					"tsx",
-					"yaml",
-					"html",
-					"css",
-					"prisma",
-					"markdown",
-					"markdown_inline",
-					"svelte",
-					"graphql",
-					"bash",
-					"lua",
-					"vim",
-					"dockerfile",
-					"gitignore",
-					"query",
-					"kotlin",
-					"rust",
-					"go",
-				},
-				incremental_selection = {
-					enable = true,
-					keymaps = {
-						init_selection = "<C-space>",
-						node_incremental = "<C-space>",
-						scope_incremental = false,
-						node_decremental = "<bs>",
-					},
-				},
-				-- enable nvim-ts-context-commentstring plugin for commenting tsx and jsx
-				context_commentstring = {
-					enable = true,
-					enable_autocmd = false,
-				},
+			ts.setup({})
+
+			local ensure_installed = {
+				-- config / markup
+				"bash",
+				"css",
+				"dockerfile",
+				"gitignore",
+				"graphql",
+				"html",
+				"json",
+				"lua",
+				"luadoc",
+				"markdown",
+				"markdown_inline",
+				"prisma",
+				"query",
+				"regex",
+				"svelte",
+				"toml",
+				"vim",
+				"vimdoc",
+				"yaml",
+				-- languages asked for
+				"c",
+				"cpp",
+				"objc",
+				"go",
+				"gomod",
+				"gosum",
+				"gowork",
+				"javascript",
+				"jsdoc",
+				"tsx",
+				"typescript",
+				"kotlin",
+				"python",
+				"rust",
+				"swift",
+			}
+
+			local installed = ts.get_installed()
+			local missing = vim.tbl_filter(function(lang)
+				return not vim.tbl_contains(installed, lang)
+			end, ensure_installed)
+			if #missing > 0 then
+				ts.install(missing)
+			end
+
+			-- start highlighting + treesitter indent for any buffer with a parser
+			vim.api.nvim_create_autocmd("FileType", {
+				group = vim.api.nvim_create_augroup("treesitter_start", { clear = true }),
+				callback = function(ev)
+					local lang = vim.treesitter.language.get_lang(ev.match)
+					if not lang or not pcall(vim.treesitter.start, ev.buf, lang) then
+						return
+					end
+					vim.bo[ev.buf].indentexpr = "v:lua.require'nvim-treesitter'.indentexpr()"
+				end,
 			})
+			-- NOTE: `incremental_selection` no longer exists on the main branch.
+			-- Node-wise selection is covered by the textobjects keymaps below.
 		end,
+	},
+	{
+		"windwp/nvim-ts-autotag",
+		event = { "BufReadPre", "BufNewFile" },
+		opts = {},
 	},
 }
