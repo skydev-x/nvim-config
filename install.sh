@@ -53,7 +53,8 @@ SUDO=""; [[ $EUID -ne 0 ]] && has sudo && SUDO="sudo"
 install_mac() {
   if ! has brew; then
     step "Installing Homebrew"
-    run env NONINTERACTIVE=1 bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+    if ((DRY)); then info "[dry] Homebrew install.sh"; else
+      NONINTERACTIVE=1 bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"; fi
     for b in /opt/homebrew/bin/brew /usr/local/bin/brew; do [[ -x $b ]] && eval "$("$b" shellenv)"; done
   fi
   step "brew packages"
@@ -171,8 +172,9 @@ link_all() {
 zsh_plugins() {
   step "oh-my-zsh + plugins"
   if [[ ! -d "$HOME/.oh-my-zsh" ]]; then
-    run env RUNZSH=no CHSH=no KEEP_ZSHRC=yes sh -c \
-      "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)" "" --unattended
+    if ((DRY)); then info "[dry] oh-my-zsh install.sh --unattended"; else
+      RUNZSH=no CHSH=no KEEP_ZSHRC=yes sh -c \
+        "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)" "" --unattended; fi
   else
     info "oh-my-zsh present"
   fi
