@@ -1,0 +1,7 @@
+# ~/.zshrc.local: machine-specific settings and secrets. NOT committed.
+# install.sh creates it from this template, moving any `export *KEY*/*TOKEN*/*SECRET*`
+# lines from your old ~/.zshrc here. Keep it private: chmod 600 ~/.zshrc.local
+
+# export OPENAI_API_KEY="..."
+# export OBSIDIAN_VAULT="$HOME/notes"       # obsidian.nvim vault
+# ZSH_THEME must be set before oh-my-zsh loads: put it in ~/.zshenv instead

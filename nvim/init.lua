@@ -1,6 +1,6 @@
 require("core")
 local lazypath = vim.fn.stdpath("data") .. "/lazy/lazy.nvim"
-if not vim.loop.fs_stat(lazypath) then
+if not vim.uv.fs_stat(lazypath) then
 	vim.fn.system({
 		"git",
 		"clone",
@@ -15,3 +15,4 @@ require("lazy").setup({
 	{ import = "plugins" },
 	{ import = "plugins.lsp" },
 })
+require("core.study") -- DSA kit + study vault keymaps (optional, see lua/core/study.lua)

@@ -5,10 +5,13 @@ return {
 		local conform = require("conform")
 
 		-- Xcode ships swift-format inside the toolchain, not on $PATH.
-		conform.formatters.swift_format = {
-			command = vim.fn.exepath("swift-format") ~= "" and "swift-format"
-				or vim.trim(vim.fn.system({ "xcrun", "--find", "swift-format" })),
-		}
+		if vim.fn.exepath("swift-format") == "" and vim.fn.has("mac") == 1 then
+			conform.formatters.swift_format = {
+				command = function()
+					return vim.trim(vim.fn.system({ "xcrun", "--find", "swift-format" }))
+				end,
+			}
+		end
 
 		conform.setup({
 			formatters_by_ft = {

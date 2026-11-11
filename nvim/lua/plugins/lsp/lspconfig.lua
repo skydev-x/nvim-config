@@ -43,9 +43,11 @@ return {
 				map("n", "gi", "<cmd>Telescope lsp_implementations<CR>", "Show LSP implementations")
 				map("n", "gt", "<cmd>Telescope lsp_type_definitions<CR>", "Show LSP type definitions")
 				map({ "n", "v" }, "<leader>ca", vim.lsp.buf.code_action, "See available code actions")
-				map("n", "<leader>rn", vim.lsp.buf.rename, "Smart rename")
+				vim.keymap.set("n", "<leader>rn", function()
+					return ":IncRename " .. vim.fn.expand("<cword>")
+				end, { buffer = ev.buf, expr = true, silent = false, desc = "Smart rename (live preview)" })
 				map("n", "<leader>D", "<cmd>Telescope diagnostics bufnr=0<CR>", "Show buffer diagnostics")
-				map("n", "<leader>d", vim.diagnostic.open_float, "Show line diagnostics")
+				map("n", "<leader>ld", vim.diagnostic.open_float, "Show line diagnostics")
 				map("n", "K", vim.lsp.buf.hover, "Show documentation under cursor")
 				map("n", "<leader>rs", "<cmd>LspRestart<CR>", "Restart LSP")
 
@@ -207,7 +209,6 @@ return {
 			"kotlin_language_server", -- kotlin
 			"pyright", -- python
 			"rust_analyzer", -- rust
-			"sourcekit", -- swift, objective-c
 			"ts_ls", -- javascript, typescript
 			-- web / misc
 			"cssls",
@@ -219,5 +220,9 @@ return {
 			"svelte",
 			"tailwindcss",
 		})
+		-- sourcekit-lsp ships with Xcode (macOS) or a Swift toolchain (Linux), not Mason
+		if vim.fn.has("mac") == 1 or vim.fn.executable("sourcekit-lsp") == 1 then
+			vim.lsp.enable("sourcekit")
+		end
 	end,
 }

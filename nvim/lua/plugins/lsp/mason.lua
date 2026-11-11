@@ -48,8 +48,6 @@ return {
 			ensure_installed = {
 				"prettier", -- js/ts/css/html/json/yaml/md formatter
 				"stylua", -- lua formatter
-				"isort", -- python import sorter
-				"black", -- python formatter
 				"ruff", -- python linter
 				"eslint_d", -- js/ts linter
 				"gofumpt", -- go formatter

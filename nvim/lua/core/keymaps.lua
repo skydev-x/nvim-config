@@ -30,12 +30,11 @@ keymap.set("n", "<leader>tx", "<cmd>tabclose<CR>", { desc = "Close current tab" 
 keymap.set("n", "<leader>tn", "<cmd>tabn<CR>", { desc = "Go to next tab" }) --  go to next tab
 keymap.set("n", "<leader>tp", "<cmd>tabp<CR>", { desc = "Go to previous tab" }) --  go to previous tab
 keymap.set("n", "<leader>tf", "<cmd>tabnew %<CR>", { desc = "Open current buffer in new tab" }) --  move current buffer to new tab
--- rename
-keymap.set("n", "<leader>rn", ":IncRename ")
 vim.keymap.set("n", "<leader>tt", '<CMD>lua require("FTerm").toggle()<CR>')
 vim.keymap.set("t", "<leader>tt", '<C-\\><C-n><CMD>lua require("FTerm").toggle()<CR>')
 -- leetcode
-keymap.set("n", "<leader>L", ":Leet<CR>", { noremap = true, silent = true })
-keymap.set("n", "<leader>l", ":Leet list<CR>", { noremap = true, silent = true })
-keymap.set("n", "<leader>t", ":Leet test<CR>", { noremap = true, silent = true })
-keymap.set("n", "<leader>s", ":Leet submit<CR>", { noremap = true, silent = true })
+-- (under <leader>L so they no longer shadow the <leader>l / <leader>t / <leader>s prefixes)
+keymap.set("n", "<leader>Lo", "<cmd>Leet<CR>", { silent = true, desc = "Leet: menu" })
+keymap.set("n", "<leader>Ll", "<cmd>Leet list<CR>", { silent = true, desc = "Leet: problem list" })
+keymap.set("n", "<leader>Lt", "<cmd>Leet test<CR>", { silent = true, desc = "Leet: run tests" })
+keymap.set("n", "<leader>Ls", "<cmd>Leet submit<CR>", { silent = true, desc = "Leet: submit" })

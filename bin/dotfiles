@@ -1,0 +1,22 @@
+#!/usr/bin/env bash
+# dotfiles: manage the personal-config repo from anywhere
+#   dotfiles update     pull latest + re-link + plugin sync (no package installs)
+#   dotfiles install    full install.sh (packages too); extra args are passed through
+#   dotfiles status     git status of the repo + where each link points
+#   dotfiles edit       open the repo in nvim
+#   dotfiles cd         print the repo path  (use: cd "$(dotfiles cd)")
+set -euo pipefail
+DIR="${PERSONAL_CONFIG:-$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")/.." && pwd)}"
+
+case "${1:-status}" in
+  update)  git -C "$DIR" pull --ff-only && "$DIR/install.sh" --no-packages "${@:2}" ;;
+  install) "$DIR/install.sh" "${@:2}" ;;
+  status)
+    git -C "$DIR" status -sb
+    for l in ~/.zshrc ~/.config/nvim ~/.config/git/ignore; do
+      printf '%-24s -> %s\n' "$l" "$(readlink "$l" 2>/dev/null || echo 'not a link')"
+    done ;;
+  edit) cd "$DIR" && exec "${EDITOR:-nvim}" . ;;
+  cd) echo "$DIR" ;;
+  *) sed -n '2,7p' "$0"; exit 2 ;;
+esac

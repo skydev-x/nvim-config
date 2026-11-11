@@ -2,14 +2,13 @@ return {
 	"epwalsh/obsidian.nvim",
 	version = "3.7.5", -- recommended, use latest release instead of latest commit
 	lazy = true,
-	ft = "markdown",
-	-- Replace the above line with this if you only want to load obsidian.nvim for markdown files in your vault:
+	-- Vault: $OBSIDIAN_VAULT or ~/docx/shared-vault. Plugin is skipped when the folder is absent.
+	cond = function()
+		return vim.fn.isdirectory(vim.fn.expand(vim.env.OBSIDIAN_VAULT or "~/docx/shared-vault")) == 1
+	end,
 	event = {
-		-- If you want to use the home shortcut '~' here you need to call 'vim.fn.expand'.
-		"BufReadPre "
-			.. vim.fn.expand("~")
-			.. "docx/shared-vault/**.md",
-		"BufNewFile " .. vim.fn.expand("~") .. "docx/shared-vault/**.md",
+		"BufReadPre " .. vim.fn.expand(vim.env.OBSIDIAN_VAULT or "~/docx/shared-vault") .. "/**.md",
+		"BufNewFile " .. vim.fn.expand(vim.env.OBSIDIAN_VAULT or "~/docx/shared-vault") .. "/**.md",
 	},
 	dependencies = {
 		-- Required.
@@ -22,7 +21,7 @@ return {
 		workspaces = {
 			{
 				name = "personal",
-				path = "~/docx/shared-vault/",
+				path = vim.env.OBSIDIAN_VAULT or "~/docx/shared-vault",
 			},
 		},
 

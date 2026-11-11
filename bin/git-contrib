@@ -1,0 +1,202 @@
+#!/usr/bin/env bash
+# git-contrib - per-author code contribution report (blame ownership + churn history)
+set -o pipefail
+
+SELF="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/$(basename "${BASH_SOURCE[0]}")"
+
+# ---- internal worker: blame one file -> "file<TAB>email<TAB>lines" ----
+if [[ "${1:-}" == "--blame-one" ]]; then
+  git blame --line-porcelain -w -M -- "$2" 2>/dev/null | awk -v F="$2" '
+    /^author-mail /{m=substr($0,14); gsub(/[<>]/,"",m); c[m]++}
+    END{for(k in c) printf "%s\t%s\t%d\n", F, k, c[k]}'
+  exit 0
+fi
+
+usage() {
+  cat <<'USAGE'
+git-contrib [options]        per-author code contribution report
+
+  -e, --ext "kt java xml"   extensions to analyse (default: kt java kts xml gradle pro)
+  -g, --group N             group modules by first N path segments (default 1)
+  -d, --deep PREFIX|auto    extra breakdown of packages under PREFIX
+                            "auto" = detect the main source package root
+  -j, --jobs N              parallel blame jobs (default: CPU count)
+  -o, --out DIR             write CSVs here
+                            (default: ~/.cache/git-contrib/<repo>, never inside the repo)
+  -m, --map FILE            identity map (default ~/.config/git-contrib/aliases)
+  -n, --no-blame            skip blame pass (churn history only, fast)
+      --since DATE          limit churn history (e.g. 2024-01-01)
+  -h, --help
+
+Identity map lines: <regex-on-lowercased-email> => <Canonical Name>   (# = comment)
+Unmapped emails fall back to the local-part before @.
+USAGE
+}
+
+EXTS="kt java kts xml gradle pro"
+GROUP=1; DEEP=""; OUT=""; MAP="$HOME/.config/git-contrib/aliases"
+JOBS="$( (command -v nproc >/dev/null && nproc) || sysctl -n hw.ncpu 2>/dev/null || echo 4)"
+NOBLAME=0; SINCE=""
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    -e|--ext) EXTS="$2"; shift 2;;
+    -g|--group) GROUP="$2"; shift 2;;
+    -d|--deep) DEEP="$2"; shift 2;;
+    -j|--jobs) JOBS="$2"; shift 2;;
+    -o|--out) OUT="$2"; shift 2;;
+    -m|--map) MAP="$2"; shift 2;;
+    -n|--no-blame) NOBLAME=1; shift;;
+    --since) SINCE="$2"; shift 2;;
+    -h|--help) usage; exit 0;;
+    *) echo "unknown option: $1" >&2; usage; exit 1;;
+  esac
+done
+
+git rev-parse --git-dir >/dev/null 2>&1 || { echo "not a git repo" >&2; exit 1; }
+ROOT="$(git rev-parse --show-toplevel)"; cd "$ROOT" || exit 1
+# default output lives outside the repo, keyed by repo name
+[[ -z "$OUT" ]] && OUT="${GIT_CONTRIB_HOME:-$HOME/.cache/git-contrib}/$(basename "$ROOT")"
+mkdir -p "$OUT"
+[[ -f "$MAP" ]] || MAP=/dev/null
+
+# -d auto: deepest single-child package dir under <module>/src/main/java|kotlin
+if [[ "$DEEP" == "auto" ]]; then
+  DEEP="$(git ls-files '*/src/main/java/*' '*/src/main/kotlin/*' | awk '
+    { i = index($0, "/src/main/java/"); L = 15
+      if (!i) { i = index($0, "/src/main/kotlin/"); L = 17 }
+      if (!i) next
+      print substr($0, 1, i + L - 1) "\t" substr($0, i + L) }' | awk -F'\t' '
+    { base[$1]++; n = split($2, p, "/")
+      for (i = 1; i < n; i++) { pre = (i == 1 ? p[1] : pre "/" p[i]); cnt[$1 SUBSEP i SUBSEP pre]++; depth[$1 SUBSEP i]++ }
+      if (n - 1 > maxd[$1]) maxd[$1] = n - 1 }
+    END { best = ""; bn = 0; for (b in base) if (base[b] > bn) { bn = base[b]; best = b }
+      pre = ""; for (i = 1; i <= maxd[best]; i++) {
+        uniq = 0; cand = ""
+        for (k in cnt) { split(k, q, SUBSEP); if (q[1] == best && q[2] + 0 == i) { uniq++; cand = q[3] } }
+        if (uniq != 1) break; pre = cand }
+      if (pre != "") print best pre "/" }')"
+  [[ -n "$DEEP" ]] && echo "deep package root: $DEEP" >&2
+fi
+
+EXTRE="\\.($(echo "$EXTS" | tr ' ' '|'))$"
+PATHSPEC=(); for e in $EXTS; do PATHSPEC+=("*.$e"); done
+
+# ---- shared awk prologue: canon() from the identity map ----
+CANON="$OUT/_canon.awk"
+cat > "$CANON" <<'AWK'
+BEGIN{
+  nmap=0
+  while ((getline line < MAPFILE) > 0) {
+    if (line ~ /^[ \t]*#/ || line ~ /^[ \t]*$/) continue
+    i = index(line, "=>"); if (!i) continue
+    r = substr(line, 1, i-1); n = substr(line, i+2)
+    gsub(/^[ \t]+|[ \t]+$/, "", r); gsub(/^[ \t]+|[ \t]+$/, "", n)
+    mre[nmap] = r; mnm[nmap] = n; nmap++
+  }
+  close(MAPFILE)
+}
+function canon(e,  x,i){
+  x = tolower(e)
+  if (x in memo) return memo[x]
+  for (i=0; i<nmap; i++) if (x ~ mre[i]) { memo[x]=mnm[i]; return mnm[i] }
+  if (x == "" || x !~ /@/) { memo[x] = "unknown<" e ">"; return memo[x] }
+  i = index(x, "@"); memo[x] = substr(x, 1, i-1); return memo[x]
+}
+AWK
+
+hr(){ printf '\n\033[1m%s\033[0m\n' "$*"; }
+
+# ================= 1. blame ownership =================
+if [[ $NOBLAME -eq 0 ]]; then
+  git ls-files -- "${PATHSPEC[@]}" > "$OUT/_files.txt"
+  NF_=$(wc -l < "$OUT/_files.txt" | tr -d ' ')
+  echo "blaming $NF_ files with $JOBS jobs..." >&2
+  xargs -P "$JOBS" -n1 "$SELF" --blame-one < "$OUT/_files.txt" > "$OUT/_blame.tsv"
+
+  { cat "$CANON"; cat <<'AWK'
+{a=canon($2); L[a]+=$3; T+=$3; k=$1 SUBSEP a; if(!(k in s)){s[k]=1; nf[a]++}}
+END{ printf "author,surviving_lines,pct,files\n"
+     for(a in L) printf "%s,%d,%.2f,%d\n", a, L[a], 100*L[a]/T, nf[a]
+     printf "TOTAL,%d,100.00,%d\n", T, NR }
+AWK
+  } > "$OUT/_a.awk"
+  awk -F'\t' -v MAPFILE="$MAP" -f "$OUT/_a.awk" "$OUT/_blame.tsv" > "$OUT/_a.csv"
+  { head -1 "$OUT/_a.csv"; grep -v '^TOTAL,' "$OUT/_a.csv" | tail -n +2 | sort -t, -k2 -rn; } > "$OUT/ownership-by-author.csv"
+
+  hr "CODE OWNERSHIP (git blame -w -M, $EXTS)"
+  { head -1 "$OUT/ownership-by-author.csv"; tail -n +2 "$OUT/ownership-by-author.csv"; grep '^TOTAL,' "$OUT/_a.csv"; } \
+    | column -t -s,
+
+  # per-file CSV
+  { cat "$CANON"; cat <<'AWK'
+{a=canon($2); L[$1 SUBSEP a]+=$3; T[$1]+=$3; F[$1]=1; K[$1 SUBSEP a]=1}
+END{ print "file,total_lines,top_owner,top_pct,second_owner,second_pct,n_authors"
+ for(f in F){ b1="";v1=-1;b2="";v2=-1;n=0
+  for(k in K){ split(k,q,SUBSEP); if(q[1]!=f) continue; n++; v=L[k]
+   if(v>v1){b2=b1;v2=v1;b1=q[2];v1=v} else if(v>v2){b2=q[2];v2=v} }
+  printf "%s,%d,%s,%.1f,%s,%.1f,%d\n", f, T[f], b1, 100*v1/T[f], (b2==""?"-":b2), (v2<0?0:100*v2/T[f]), n }}
+AWK
+  } > "$OUT/_f.awk"
+  awk -F'\t' -v MAPFILE="$MAP" -f "$OUT/_f.awk" "$OUT/_blame.tsv" > "$OUT/_f.csv"
+  { head -1 "$OUT/_f.csv"; tail -n +2 "$OUT/_f.csv" | sort -t, -k2 -rn; } > "$OUT/ownership-by-file.csv"
+
+  # per-module table
+  { cat "$CANON"; cat <<'AWK'
+{a=canon($2); n=split($1,p,"/"); m=p[1]
+ for(i=2;i<=DEPTH && i<n;i++) m=m"/"p[i]
+ if (DEEPPFX!=""){ if (index($1,DEEPPFX)!=1) next
+   rest=substr($1,length(DEEPPFX)+1); split(rest,q,"/"); m=(q[2]==""?"(root)":q[1]) }
+ L[m SUBSEP a]+=$3; T[m]+=$3; A[a]=1; M[m]=1}
+END{ n=0; for(m in M) o[n++]=m
+ for(i=0;i<n;i++)for(j=i+1;j<n;j++) if(T[o[j]]>T[o[i]]){t=o[i];o[i]=o[j];o[j]=t}
+ for(i=0;i<n && i<LIMIT;i++){ m=o[i]; if(T[m]<MINL) continue
+  printf "%-34s %8d  ", m, T[m]
+  c=0; delete used
+  while(c<TOPN){ b="";bv=-1
+   for(a in A){ k=m SUBSEP a; if(k in L && !(a in used) && L[k]>bv){bv=L[k];b=a} }
+   if(b=="")break; used[b]=1; printf "%s %.0f%%  ", b, 100*bv/T[m]; c++ }
+  print "" }}
+AWK
+  } > "$OUT/_m.awk"
+  hr "BY MODULE (depth $GROUP)"
+  awk -F'\t' -v MAPFILE="$MAP" -v DEPTH="$GROUP" -v DEEPPFX="" -v LIMIT=40 -v MINL=200 -v TOPN=4 \
+      -f "$OUT/_m.awk" "$OUT/_blame.tsv"
+  if [[ -n "$DEEP" ]]; then
+    hr "BY PACKAGE under $DEEP"
+    awk -F'\t' -v MAPFILE="$MAP" -v DEPTH="$GROUP" -v DEEPPFX="$DEEP" -v LIMIT=30 -v MINL=1000 -v TOPN=3 \
+        -f "$OUT/_m.awk" "$OUT/_blame.tsv"
+  fi
+fi
+
+# ================= 2. churn history =================
+SINCEARG=(); [[ -n "$SINCE" ]] && SINCEARG=(--since "$SINCE")
+git log --no-merges "${SINCEARG[@]}" --numstat --format='C|%aE|%ad' --date=short > "$OUT/_numstat.txt"
+
+{ cat "$CANON"; cat <<'AWK'
+/^C\|/{ split($0,p,"|"); a=canon(p[2]); y=substr(p[3],1,4); C[a]++; CY[a SUBSEP y]++; Y[y]=1; A[a]=1; next }
+NF==3 && $1!="-" {
+  if ($3 ~ /\/(build|\.gradle|\.idea|node_modules)\//) next
+  if ($3 !~ EXTRE) next
+  ADD[a]+=$1; DEL[a]+=$2; L[a SUBSEP y]+=$1+$2
+  k=a SUBSEP $3; if(!(k in seen)){seen[k]=1; NFI[a]++} }
+END{
+ ny=0; for(y in Y) ys[ny++]=y
+ for(i=0;i<ny;i++)for(j=i+1;j<ny;j++) if(ys[j]<ys[i]){t=ys[i];ys[i]=ys[j];ys[j]=t}
+ na=0; for(a in A){ as[na++]=a; tot=0; for(i=0;i<ny;i++) tot+=L[a SUBSEP ys[i]]; TT[a]=tot }
+ for(i=0;i<na;i++)for(j=i+1;j<na;j++) if(TT[as[j]]>TT[as[i]]){t=as[i];as[i]=as[j];as[j]=t}
+ printf "%-24s %8s %9s %9s %8s", "author","commits","added","deleted","files"
+ for(i=0;i<ny;i++) printf "%8s", ys[i]; print "   (churn k-lines/yr)"
+ for(i=0;i<na;i++){ a=as[i]
+  printf "%-24s %8d %9d %9d %8d", a, C[a], ADD[a], DEL[a], NFI[a]
+  for(k=0;k<ny;k++) printf "%8d", L[a SUBSEP ys[k]]/1000
+  print "" }}
+AWK
+} > "$OUT/_y.awk"
+
+hr "CHURN HISTORY (git log --no-merges${SINCE:+ --since $SINCE})"
+awk -v MAPFILE="$MAP" -v EXTRE="$EXTRE" -f "$OUT/_y.awk" "$OUT/_numstat.txt"
+
+rm -f "$OUT"/_*.awk "$OUT"/_a.csv "$OUT"/_f.csv "$OUT"/_files.txt "$OUT"/_numstat.txt
+[[ $NOBLAME -eq 0 ]] && printf '\nCSVs: %s/ownership-by-author.csv  %s/ownership-by-file.csv\n' "$OUT" "$OUT"
+exit 0
