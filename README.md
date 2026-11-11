@@ -73,6 +73,7 @@ Add a script: drop an executable into `bin/`. It is on `PATH` in every new shell
 | `<leader>Lo` `Ll` `Lt` `Ls` | Leet menu, list, test, submit | `<leader>L` `l` `t` `s`, which shadowed `<leader>t*`, `<leader>s*` and `<leader>ll` |
 | `<leader>ld` | line diagnostics | `<leader>d`, which delayed every DSA `<leader>d*` key |
 | `<leader>rn` | LSP rename with live preview (inc-rename) | two conflicting maps |
+| `<leader>mr` | toggle render-markdown (rendered headings, tables, code, callouts, `[[wikilinks]]` in `.md`) | new |
 
 DSA study keys (with the kit installed):
 

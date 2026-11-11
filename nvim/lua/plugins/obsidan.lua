@@ -17,6 +17,7 @@ return {
 		-- see below for full list of optional dependencies 👇
 	},
 	opts = {
+		ui = { enable = false }, -- render-markdown.nvim draws the markdown UI
 
 		workspaces = {
 			{
